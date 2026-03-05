@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -19,18 +20,56 @@ from app.models import Book, User
 DEFAULT_SOURCE_DB_URL = f"sqlite:///{BACKEND_DIR / 'library.db'}"
 
 
-def normalize_db_url(db_url: str) -> str:
-    """Normalize provider URLs to the driver stack used by this project."""
+def normalize_db_url(db_url: str) -> tuple[str, dict]:
+    """Normalize provider URL/query params for SQLAlchemy + PyMySQL."""
+    connect_args: dict = {}
+
     if db_url.startswith("mysql://"):
-        return "mysql+pymysql://" + db_url[len("mysql://") :]
-    return db_url
+        db_url = "mysql+pymysql://" + db_url[len("mysql://") :]
+
+    parts = urlsplit(db_url)
+    if not parts.scheme.startswith("mysql+pymysql"):
+        return db_url, connect_args
+
+    query_pairs = parse_qsl(parts.query, keep_blank_values=True)
+    normalized_pairs = []
+    force_ssl = False
+
+    for raw_key, value in query_pairs:
+        key = raw_key.replace("-", "_")
+        key_lower = key.lower()
+        value_lower = value.lower()
+
+        if key_lower == "ssl_mode":
+            if value_lower in {"required", "preferred", "verify_ca", "verify_identity", "true", "1", "yes"}:
+                force_ssl = True
+            continue
+
+        if key_lower == "ssl":
+            if value_lower in {"true", "1", "yes", "required"}:
+                force_ssl = True
+            continue
+
+        normalized_pairs.append((key, value))
+
+    if force_ssl:
+        connect_args["ssl"] = {}
+
+    normalized_query = urlencode(normalized_pairs, doseq=True)
+    normalized_url = urlunsplit((parts.scheme, parts.netloc, parts.path, normalized_query, parts.fragment))
+    return normalized_url, connect_args
 
 
 def build_engine(db_url: str):
-    db_url = normalize_db_url(db_url)
+    db_url, normalized_connect_args = normalize_db_url(db_url)
     engine_kwargs = {"pool_pre_ping": True}
+    connect_args = {}
+    if normalized_connect_args:
+        connect_args.update(normalized_connect_args)
     if db_url.startswith("sqlite"):
-        engine_kwargs["connect_args"] = {"check_same_thread": False}
+        connect_args["check_same_thread"] = False
+    if connect_args:
+        engine_kwargs["connect_args"] = connect_args
     return create_engine(db_url, **engine_kwargs)
 
 
