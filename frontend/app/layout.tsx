@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
             <footer className="mt-10 border-t border-zinc-300 pt-4 text-center text-sm text-zinc-600">
               Made by Angadh Verma. 
-              Source code available on <a href="https://github.com/angadh/library-management" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">GitHub</a>.
+              Source code available on <a href="https://github.com/angadh-v/bookflow" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">GitHub</a>.
             </footer>
           </div>
         </UserProvider>

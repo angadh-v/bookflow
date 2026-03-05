@@ -49,6 +49,28 @@ cd backend
 pytest -q
 ```
 
+## Move Local Data To Aiven
+
+Use this one-time script to copy your local SQLite data (`backend/library.db`) into Aiven MySQL.
+
+```bash
+cd backend
+
+# 1) Preview without writing
+TARGET_DATABASE_URL="mysql+pymysql://USER:PASS@HOST:PORT/DB?ssl=true" \
+  .venv/bin/python scripts/migrate_local_to_aiven.py --dry-run
+
+# 2) Run for real
+TARGET_DATABASE_URL="mysql+pymysql://USER:PASS@HOST:PORT/DB?ssl=true" \
+  .venv/bin/python scripts/migrate_local_to_aiven.py
+```
+
+The script upserts:
+- `users` by `auth0_id`
+- `books` by `isbn` (fallback: `title + author`)
+
+It keeps your local DB unchanged and can be re-run safely.
+
 ## Important Environment Variables
 
 ### Backend
